@@ -1,10 +1,23 @@
 # Changelog
 
-## v0.3.0 - (unreleased)
+## v0.4.0 - (unreleased)
+  - [**NEW**] Added CloudWatch Logs publisher (thanks to @etolbakov)
+  - Performance improvement in ***μ/trace***
+
+
+## v0.3.1 - (2020-07-10)
+  - Zipkin: fix of publishing tags with nil values
+
+
+## v0.3.0 - (2020-07-08)
+  - [**NEW**] Added Kinesis publisher (thanks to @etolbakov)
+  - [**NEW**] Added Slack publisher (thanks to @anonimitoraf)
+  - [**NEW**] Added JVM Metrics publisher (thanks to @PabloReszczynski)
+  - ELS: auto-detects the version by default
 
 
 ## v0.2.0 - (2020-05-03)
-  - Added flag to support ElasticSearch v6.x correctly
+  - Added flag to support Elasticsearch v6.x correctly
   - Added `:mulog/trace-id` to base event with a flake (192 bit time-ordered unique id)
   - [**NEW**] Added Zipkin publisher
   - `μ/trace` function api change. (**BREAKING CHANGE**)

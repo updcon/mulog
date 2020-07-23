@@ -72,11 +72,11 @@
 
   (def st
     (u/start-publisher!
-     {:type :console}))
+      {:type :console}))
 
   (def st2
     (u/start-publisher!
-     {:type :zipkin :url "http://localhost:9411/"}))
+      {:type :zipkin :url "http://localhost:9411/"}))
 
   (u/log :test :t (rand))
 
@@ -142,11 +142,11 @@
 
   (u/log ::hello :to "World!" :v (rand-int 1000))
   (def x (u/start-publisher!
-          {:type :console
-           :transform (fn [events]
-                        (->> events
-                          (filter #(< (:v %) 500))
-                          (map #(update % :v -))))}))
+           {:type :console
+            :transform (fn [events]
+                         (->> events
+                           (filter #(< (:v %) 500))
+                           (map #(update % :v -))))}))
 
   (x)
 
@@ -191,6 +191,30 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                                                                            ;;
+;;                   ----==| J V M - M E T R I C S |==----                    ;;
+;;                                                                            ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(comment
+
+  (u/log ::hello :to "World!")
+
+  (u/start-publisher! {:type :console})
+
+  (u/log ::hello :to "World!" :v (rand-int 1000))
+  (u/log ::hello :to "World!" :v "ciao")
+  (def x (u/start-publisher! {:type :jvm-metrics
+                              :sampling-interval 3000}))
+
+  (x)
+
+  )
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                            ;;
 ;;                         ----==| K A F K A |==----                          ;;
 ;;                                                                            ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -205,6 +229,33 @@
 
   (def x (u/start-publisher! {:type :kafka
                               :kafka {:bootstrap.servers "192.168.200.200:9092"}}))
+
+  (x)
+
+
+  )
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                            ;;
+;;                         ----==| S L A C K |==----                          ;;
+;;                                                                            ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(comment
+
+  (u/log ::hello :to "World!")
+
+  (u/start-publisher! {:type :console})
+
+  (u/log ::hello2 :to "World!" :v (rand-int 1000))
+
+  (def x (u/start-publisher!
+           {:type        :slack
+            :webhook-url "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
+            :transform   (partial filter #(= ::hello (:mulog/event-name %)))}))
 
   (x)
 
@@ -273,8 +324,8 @@
 
   ;; publisher for examples
   (require '[com.brunobonacci.mulog.buffer :as rb]
-           '[com.brunobonacci.mulog.utils :as ut]
-           '[clojure.pprint :refer [pprint]])
+    '[com.brunobonacci.mulog.utils :as ut]
+    '[clojure.pprint :refer [pprint]])
 
 
   (deftype ExamplesPublisher
@@ -311,7 +362,7 @@
   (st)
   (def st
     (u/start-publisher!
-     {:type :inline :publisher (examples-publisher)}))
+      {:type :inline :publisher (examples-publisher)}))
 
   (u/log ::example :foo :baz, :bar 1)
   )

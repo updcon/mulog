@@ -3,31 +3,10 @@
             [com.brunobonacci.mulog.buffer :as rb]
             [com.brunobonacci.mulog.utils :as ut]
             [com.brunobonacci.mulog.flakes :as f :refer [flake]]
+            [com.brunobonacci.mulog.common.json :as json]
+            [com.brunobonacci.mulog :as u]
             [clj-http.client :as http]
-            [cheshire.core :as json]
-            [cheshire.generate :as gen]
-            [clojure.string :as str]
-            [com.brunobonacci.mulog :as u]))
-
-
-
-;;
-;; Add Exception encoder to JSON generator
-;;
-(gen/add-encoder java.lang.Throwable
-                 (fn [x ^com.fasterxml.jackson.core.JsonGenerator json]
-                   (gen/write-string json ^String (ut/exception-stacktrace x))))
-
-(gen/add-encoder com.brunobonacci.mulog.core.Flake
-                 (fn [x ^com.fasterxml.jackson.core.JsonGenerator json]
-                   (gen/write-string json ^String (str x))))
-
-
-
-;; TODO: handle records which can't be serialized.
-(defn- to-json
-  [m]
-  (json/generate-string m {:date-format "yyyy-MM-dd'T'HH:mm:ss.SSSX"}))
+            [clojure.string :as str]))
 
 
 
@@ -88,13 +67,13 @@
 (defn- post-records
   [{:keys [url publish-delay] :as config} records]
   (http/post
-   url
-   {:content-type "application/json"
-    :accept :json
-    :as     :json
-    :socket-timeout     publish-delay
-    :connection-timeout publish-delay
-    :body (to-json (prepare-records config records))}))
+    url
+    {:content-type "application/json"
+     :accept :json
+     :as     :json
+     :socket-timeout     publish-delay
+     :connection-timeout publish-delay
+     :body (json/to-json (prepare-records config records))}))
 
 
 
@@ -187,8 +166,8 @@
   [{:keys [url max-items] :as config}]
   {:pre [url]}
   (ZipkinPublisher.
-   (as-> config $
-     (merge DEFAULT-CONFIG $)
-     (update $ :url normalize-endpoint-url))
-   (rb/agent-buffer 20000)
-   (or (:transform config) identity)))
+    (as-> config $
+      (merge DEFAULT-CONFIG $)
+      (update $ :url normalize-endpoint-url))
+    (rb/agent-buffer 20000)
+    (or (:transform config) identity)))

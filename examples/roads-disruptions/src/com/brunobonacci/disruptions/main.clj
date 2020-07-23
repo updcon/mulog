@@ -14,8 +14,8 @@
    {:base  #(str (url "https://api.tfl.gov.uk" %))
     :roads "https://api.tfl.gov.uk/road"
     :disruptions #(str (url "https://api.tfl.gov.uk/road"
-                            (url-encode %)
-                            "disruption"))}
+                         (url-encode %)
+                         "disruption"))}
 
 
    :mulog
@@ -30,7 +30,11 @@
      ;; send events to kafka
      {:type :kafka :kafka {:bootstrap.servers "192.168.200.200:9092,127.0.0.1:9092"}}
      ;; send events to zipkin
-     {:type :zipkin :url  "http://localhost:9411/"}]}})
+     {:type :zipkin :url  "http://localhost:9411/"}
+     ;; send events to slack
+     #_{:type :slack
+        :webhook-url "https://hooks.slack.com/services/.../.../..."
+        :transform identity}]}})
 
 
 
@@ -39,7 +43,7 @@
 
   ;; set global context
   (μ/set-global-context!
-   {:app-name "roads-disruptions", :version "0.1.0", :env "local"})
+    {:app-name "roads-disruptions", :version "0.1.0", :env "local"})
 
   (μ/start-publisher! mulog))
 

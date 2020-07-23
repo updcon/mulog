@@ -44,7 +44,7 @@
         u1   (.getMostSignificantBits uuid)
         u2   (.getLeastSignificantBits uuid)]
     (str (Long/toUnsignedString u1 36)
-         (Long/toUnsignedString u2 36))))
+      (Long/toUnsignedString u2 36))))
 
 
 
@@ -105,18 +105,13 @@
 
 
 (defn remove-nils
-  "recursively remove nils from maps, vectors and lists."
+  "recursively remove nils from maps (in keys or values)"
   [m]
-  (->> m
-    (w/postwalk
-        (fn [i]
-          (cond
-            (map? i)        (into {} (remove (comp nil? second) i))
-            (map-entry? i)  i
-            (vector? i)     (into [] (remove nil? i))
-            (set? i)        (into #{} (remove nil? i))
-            (sequential? i) (remove nil? i)
-            :else           i)))))
+  (w/postwalk
+    #(if (map? %)
+       (into {} (remove (fn [[k v]] (or (nil? v) (nil? k))) %))
+       %)
+    m))
 
 
 
@@ -126,3 +121,12 @@
   (->> m
     (map (fn [[k v]] [k (f v)]))
     (into {})))
+
+
+
+(defmacro defalias
+  "Create a local var with the same value of a var from another namespace"
+  [dest src]
+  `(do
+     (def ~dest (var ~src))
+     (alter-meta! (var ~dest) merge (select-keys (meta (var ~src)) [:doc :arglists]))))

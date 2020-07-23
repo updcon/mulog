@@ -19,10 +19,10 @@
 
   => (just
         [(just
-          {:mulog/event-name :test
-           :mulog/timestamp anything
-           :mulog/trace-id anything
-           :mulog/namespace (str *ns*)})])
+           {:mulog/event-name :test
+            :mulog/timestamp anything
+            :mulog/trace-id anything
+            :mulog/namespace (str *ns*)})])
   )
 
 
@@ -34,8 +34,8 @@
 
   => (just
         [(contains
-          {:mulog/event-name :test
-           :value1 1 :v2 "b" :v3 {:d [:e :f :g]}})])
+           {:mulog/event-name :test
+            :value1 1 :v2 "b" :v3 {:d [:e :f :g]}})])
   )
 
 
@@ -48,8 +48,8 @@
 
   => (just
         [(contains
-          {:mulog/event-name :test :v1 1
-           :app "demo" :version 1 :env "local"})])
+           {:mulog/event-name :test :v1 1
+            :app "demo" :version 1 :env "local"})])
   )
 
 
@@ -64,11 +64,11 @@
 
   => (just
         [(contains
-          {:mulog/event-name :test :v1 1
-           :app "demo" :version 1 :env "local"})
+           {:mulog/event-name :test :v1 1
+            :app "demo" :version 1 :env "local"})
          (contains
-          {:mulog/event-name :test :v1 2
-           :app "demo" :version 2 :env "local"})])
+           {:mulog/event-name :test :v1 2
+            :app "demo" :version 2 :env "local"})])
   )
 
 
@@ -83,11 +83,11 @@
 
   => (just
         [(contains
-          {:mulog/event-name :test :v1 1
-           :app "demo" :version 1 :env "local"})
+           {:mulog/event-name :test :v1 1
+            :app "demo" :version 1 :env "local"})
          (contains
-          {:mulog/event-name :test :v1 2
-           :app "demo" :version 2 :env "local"})])
+           {:mulog/event-name :test :v1 2
+            :app "demo" :version 2 :env "local"})])
   )
 
 
@@ -100,8 +100,8 @@
 
   => (just
         [(contains
-          {:mulog/event-name :test
-           :app "new-app" :version 1 :env "local"})])
+           {:mulog/event-name :test
+            :app "new-app" :version 1 :env "local"})])
   )
 
 
@@ -114,7 +114,7 @@
 
   => (just
         [(contains
-          {:mulog/event-name :test :local 1})])
+           {:mulog/event-name :test :local 1})])
   )
 
 
@@ -128,7 +128,7 @@
 
   => (just
         [(contains
-          {:mulog/event-name :test :local 1 :sub-local :a})])
+           {:mulog/event-name :test :local 1 :sub-local :a})])
   )
 
 
@@ -146,15 +146,15 @@
 
   => (just
         [(contains
-          {:mulog/event-name :before :l 0})
+           {:mulog/event-name :before :l 0})
          (contains
-          {:mulog/event-name :ctx :l 1 :local 1})
+           {:mulog/event-name :ctx :l 1 :local 1})
          (contains
-          {:mulog/event-name :ctx :l 2 :local 1 :sub-local :a})
+           {:mulog/event-name :ctx :l 2 :local 1 :sub-local :a})
          (contains
-          {:mulog/event-name :ctx :l 1 :local 1 :out true})
+           {:mulog/event-name :ctx :l 1 :local 1 :out true})
          (contains
-          {:mulog/event-name :after :l 0})])
+           {:mulog/event-name :after :l 0})])
   )
 
 
@@ -168,7 +168,7 @@
 
   => (just
         [(contains
-          {:mulog/event-name :test :local 2 :sub-local :a})])
+           {:mulog/event-name :test :local 2 :sub-local :a})])
   )
 
 
@@ -183,9 +183,9 @@
 
   => (just
         [(contains
-          {:mulog/event-name :test :global 1})
+           {:mulog/event-name :test :global 1})
          (contains
-          {:mulog/event-name :test :global 2 :local :a})])
+           {:mulog/event-name :test :global 2 :local :a})])
   )
 
 
@@ -200,9 +200,9 @@
 
   => (just
         [(contains
-          {:mulog/event-name :test :global :overwrite})
+           {:mulog/event-name :test :global :overwrite})
          (contains
-          {:mulog/event-name :test :global :overwrite2 :local :overwrite2})])
+           {:mulog/event-name :test :global :overwrite2 :local :overwrite2})])
   )
 
 
@@ -259,16 +259,16 @@
 
   => (just
         [(just
-          {:mulog/event-name   :test
-           :mulog/timestamp    anything
-           :mulog/trace-id     anything
-           ;; no parent trace
-           :mulog/parent-trace nil?
-           :mulog/root-trace   anything
-           :mulog/namespace    (str *ns*)
-           :mulog/outcome      :ok
-           ;; duration is in nanoseconds
-           :mulog/duration     #(and (number? %) (> % 1000000))})])
+           {:mulog/event-name   :test
+            :mulog/timestamp    anything
+            :mulog/trace-id     anything
+            ;; no parent trace
+            :mulog/parent-trace nil?
+            :mulog/root-trace   anything
+            :mulog/namespace    (str *ns*)
+            :mulog/outcome      :ok
+            ;; duration is in nanoseconds
+            :mulog/duration     #(and (number? %) (> % 1000000))})])
   )
 
 
@@ -278,25 +278,25 @@
   (tp/with-test-publisher
 
     (tp/ignore
-     (u/trace :test
-       []
-       (Thread/sleep 1)
-       (throw (ex-info "BOOM" {}))))
+      (u/trace :test
+        []
+        (Thread/sleep 1)
+        (throw (ex-info "BOOM" {}))))
     )
 
   => (just
         [(just
-          {:mulog/event-name   :test
-           :mulog/timestamp    anything
-           :mulog/trace-id     anything
-           ;; no parent trace
-           :mulog/parent-trace nil?
-           :mulog/root-trace   anything
-           :mulog/namespace    (str *ns*)
-           :mulog/outcome      :error
-           ;; duration is in nanoseconds
-           :mulog/duration     #(and (number? %) (> % 1000000))
-           :exception          #(instance? Exception %)})])
+           {:mulog/event-name   :test
+            :mulog/timestamp    anything
+            :mulog/trace-id     anything
+            ;; no parent trace
+            :mulog/parent-trace nil?
+            :mulog/root-trace   anything
+            :mulog/namespace    (str *ns*)
+            :mulog/outcome      :error
+            ;; duration is in nanoseconds
+            :mulog/duration     #(and (number? %) (> % 1000000))
+            :exception          #(instance? Exception %)})])
   )
 
 
@@ -315,13 +315,13 @@
 
   => (just
         [(contains
-          {:mulog/event-name :inner
-           :key3             3})
+           {:mulog/event-name :inner
+            :key3             3})
 
          (contains
-          {:mulog/event-name :test
-           :key1             :value1
-           :key2             2})])
+           {:mulog/event-name :test
+            :key1             :value1
+            :key2             2})])
 
   )
 
@@ -340,15 +340,15 @@
 
   => (just
         [(contains
-          {:mulog/event-name :inner
-           :key3             3
-           :cntx1            "value1"})
+           {:mulog/event-name :inner
+            :key3             3
+            :cntx1            "value1"})
 
          (contains
-          {:mulog/event-name :test
-           :key1             :value1
-           :key2             2
-           :cntx1            "value1"})])
+           {:mulog/event-name :test
+            :key1             :value1
+            :key2             2
+            :cntx1            "value1"})])
 
   )
 
@@ -367,15 +367,15 @@
 
   => (just
         [(contains
-          {:mulog/event-name :inner
-           :key3             3
-           :global           1})
+           {:mulog/event-name :inner
+            :key3             3
+            :global           1})
 
          (contains
-          {:mulog/event-name :test
-           :key1             :value1
-           :key2             2
-           :global           1})])
+           {:mulog/event-name :test
+            :key1             :value1
+            :key2             2
+            :global           1})])
 
   )
 
@@ -461,33 +461,33 @@
         {:http-status 200 :body "OK"}))
     => (just
           [(contains
-            {:mulog/event-name :test
-             :key1             "value1"
-             :http-status      200})]))
+             {:mulog/event-name :test
+              :key1             "value1"
+              :http-status      200})]))
 
 
   (fact "fail case"
     (tp/with-test-publisher
       (tp/ignore
-       (u/trace :test
-         {:pairs   [:key1 "value1"]
-          :capture #(select-keys % [:http-status])}
-         (throw (ex-info "BOOM" {})))))
+        (u/trace :test
+          {:pairs   [:key1 "value1"]
+           :capture #(select-keys % [:http-status])}
+          (throw (ex-info "BOOM" {})))))
 
     => (just
           [(contains
-            {:mulog/event-name :test
-             :key1             "value1"
-             :mulog/outcome    :error})]))
+             {:mulog/event-name :test
+              :key1             "value1"
+              :mulog/outcome    :error})]))
 
 
   (fact "fail case, doesn't contain the extraction"
     (->> (tp/with-test-publisher
          (tp/ignore
-          (u/trace :test
-            {:pairs   [:key1 "value1"]
-             :capture #(select-keys % [:http-status])}
-            (throw (ex-info "BOOM" {})))))
+           (u/trace :test
+             {:pairs   [:key1 "value1"]
+              :capture #(select-keys % [:http-status])}
+             (throw (ex-info "BOOM" {})))))
       first
       :http-status) => nil)
 
@@ -501,7 +501,22 @@
 
     => (just
           [(contains
-            {:mulog/event-name :test
-             :key1             "value1"
-             :mulog/capture    :error})]))
+             {:mulog/event-name :test
+              :key1             "value1"
+              :mulog/capture    :error})]))
+
+
+  (fact "extraction can redefine internal properties such as :outcome and :exception"
+    (tp/with-test-publisher
+      (u/trace :test
+        {:pairs   [:key1 "value1"]
+         :capture (constantly {:mulog/outcome :error :exception (ex-info "Logical errror" {})})}
+        {:http-status 500 :body "some error as a value"}))
+    => (just
+          [(contains
+             {:mulog/event-name :test
+              :mulog/outcome    :error
+              :exception        (partial instance? Exception)
+              :key1             "value1"
+              })]))
   )
