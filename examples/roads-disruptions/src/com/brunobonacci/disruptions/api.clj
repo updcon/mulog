@@ -38,12 +38,13 @@
           (swap! active-disruptions
             (fn [old new]
               (->>
-                  (merge
-                      (index-by #(get % "id") old)
-                    (index-by #(get % "id") new))
+                (merge
+                  (index-by #(get % "id") old)
+                  (index-by #(get % "id") new))
                 (map second)))
             disruptions))
         :on-error
+        :tracking :disabled
         :max-retries :forever
         :message "Polling disruptions data")
       ;; sleep between 30s-2min between polls

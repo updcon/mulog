@@ -5,7 +5,8 @@
             [com.brunobonacci.mulog.buffer :as rb]
             [com.brunobonacci.mulog.utils :as ut]
             [com.brunobonacci.mulog.flakes :refer [flake]]
-            [com.brunobonacci.mulog.core :as core]))
+            [com.brunobonacci.mulog.core :as core]
+            [clojure.walk :as walk]))
 
 
 
@@ -57,6 +58,17 @@
   ;; stop publishers
   (p1)
   (p2)
+  )
+
+
+
+(comment
+
+  ;; list registered publishers
+  (core/registered-publishers)
+  ;; STOP LAST publisher
+  (core/stop-publisher! (->> (core/registered-publishers) last :id))
+
   )
 
 
@@ -138,7 +150,7 @@
 
   (u/log ::hello :to "World!")
 
-  (u/start-publisher! {:type :console})
+  (u/start-publisher! {:type :console :pretty? true})
 
   (u/log ::hello :to "World!" :v (rand-int 1000))
   (def x (u/start-publisher!
@@ -150,17 +162,48 @@
 
   (x)
 
+  (u/start-publisher!
+    {:type :console
+     :pretty? true
+     :transform
+     (fn [events]
+       (filter #(or (= (:mulog/event-name %) :myapp/payment-done )
+                  (= (:mulog/event-name %) :myapp/transaction-closed ))
+         events))})
+
+  (require '[where.core :refer [where]])
+
+  (u/start-publisher!
+    {:type :console
+     :pretty? true
+     :transform
+     (partial filter (where :mulog/event-name :in? [:myapp/payment-done :myapp/transaction-closed]))})
+
+  (u/log :myapp/payment-done :amount 150.30)
+
+  (core/stop-publisher! (->> (core/registered-publishers) last :id))
   )
 
 
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                            ;;
+;;                  ----==| C O N S O L E - J S O N |==----                   ;;
+;;                                                                            ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (comment
 
-  ;; stop publisher
-  (core/registered-publishers)
-  ;; STOPLAST
-  (core/stop-publisher! (->> (core/registered-publishers) last :id))
+  (u/log ::hello :to "World!")
 
+  (def x (u/start-publisher! {:type :console-json}))
+  (def x (u/start-publisher! {:type :console-json :pretty? true}))
+
+  (u/log ::hello :to "World!" :v (rand-int 1000))
+  (u/log ::hello :to "World!" :v "ciao")
+
+  (x)
 
   )
 
@@ -183,6 +226,10 @@
   (def x (u/start-publisher! {:type :elasticsearch
                               :url "http://localhost:9200/"}))
 
+  (def x (u/start-publisher! {:type :elasticsearch
+                              :url "http://localhost:9200/"
+                              :data-stream "mulog-stream"}))
+
   (x)
 
   )
@@ -200,12 +247,72 @@
 
   (u/log ::hello :to "World!")
 
-  (u/start-publisher! {:type :console})
+  (u/start-publisher! {:type :console :pretty? true})
 
   (u/log ::hello :to "World!" :v (rand-int 1000))
   (u/log ::hello :to "World!" :v "ciao")
   (def x (u/start-publisher! {:type :jvm-metrics
-                              :sampling-interval 3000}))
+                              :sampling-interval 3000
+                              ;;:transform-samples (partial map walk/stringify-keys)
+                              }))
+
+  (x)
+
+  )
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                            ;;
+;;            ----==| F I L E S Y S T E M   M E T R I C S |==----             ;;
+;;                                                                            ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(comment
+
+  (u/log ::hello :to "World!")
+
+  (u/start-publisher! {:type :console :pretty? true})
+
+  (u/log ::hello :to "World!" :v (rand-int 1000))
+
+  (def x (u/start-publisher!
+           {:type :filesystem-metrics
+            ;; the interval in millis between two samples (default: 60s)
+            :sampling-interval 5000
+            ;; transform metrics (e.g. filter only volumes over 1 GB)
+            ;; (default: `nil` leaves metrics unchanged)
+            ;;:transform (partial map walk/stringify-keys)
+            ;;:transform-samples (partial map walk/stringify-keys)
+            }))
+
+  (x)
+
+  )
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                            ;;
+;;                 ----==| M B E A N - S A M P L E R |==----                  ;;
+;;                                                                            ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(comment
+
+  (u/log ::hello :to "World!")
+
+  (u/start-publisher! {:type :console :pretty? true})
+  (u/log ::hello :to "World!" :v (rand-int 1000))
+
+  (def x (u/start-publisher!
+           {:type :mbean
+            :mbeans-patterns ["java.lang:type=Memory" "java.nio:*"]
+            :sampling-interval 5000
+            ;;:transform walk/stringify-keys
+            ;;:transform-samples (partial map walk/stringify-keys)
+            }))
 
   (x)
 
@@ -228,7 +335,8 @@
   (u/log ::hello :to "World!" :v (rand-int 1000))
 
   (def x (u/start-publisher! {:type :kafka
-                              :kafka {:bootstrap.servers "192.168.200.200:9092"}}))
+                              :format :nippy
+                              :kafka {:bootstrap.servers "localhost:9092"}}))
 
   (x)
 
@@ -277,19 +385,101 @@
 
   (u/log ::hello :to "World!")
 
-  (u/start-publisher! {:type :console})
+  (u/start-publisher! {:type :console :pretty? true})
 
   (def x (u/start-publisher! {:type :zipkin
                               :url "http://localhost:9411/"}))
 
-  (let [t (rand-int 3000)]
+  (let [t (rand-int 1000)]
     (u/trace ::sleep
       [:time t :struct {:foo 1 :bar 2}]
       (Thread/sleep t)))
 
 
+  (u/trace ::sleep-outer
+    [:struct {:foo 1 :bar 2}]
+    (Thread/sleep (rand-int 1000))
+
+    (u/trace ::sleep-inner
+      [:step 1]
+      (Thread/sleep (rand-int 1000)))
+
+    (try
+      (u/trace ::sleep-inner
+        [:step 2]
+        (Thread/sleep (rand-int 1000))
+        (/ 1 0))
+      (catch Exception _))
+
+    (u/trace ::sleep-inner
+      [:step 3]
+      (Thread/sleep (rand-int 1000)))
+    )
+
   (x)
 
+
+  )
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                            ;;
+;;                    ----==| P R O M E T H E U S |==----                     ;;
+;;                                                                            ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(comment
+
+  (u/log ::hello :to "World!")
+
+  (u/start-publisher! {:type :console})
+
+  (u/log ::hello2 :to "World!" :v (rand-int 1000))
+
+  (u/trace ::long-op
+    [:mode :test]
+    (Thread/sleep (+ 1000 (rand-int 300))))
+
+  (def x (u/start-publisher!
+           {:type :prometheus
+            :push-gateway
+            {:job      "mulog-demo"
+             :endpoint "http://localhost:9091"}}))
+
+  (x)
+
+
+  (require '[com.brunobonacci.mulog.publishers.prometheus :as prom])
+  ;; create your publisher
+  (def pub (prom/prometheus-publisher {:type :prometheus}))
+  ;; start the publisher
+  (def px (u/start-publisher! {:type :inline :publisher pub}))
+
+  (prom/registry pub)
+  (prom/write-str pub)
+
+  ;; ring - handler to export
+  (fn [_]
+    {:status  200
+     :headers {"Content-Type" "text/plain; version=0.0.4"}
+     :body    (prom/write-str pub)})
+
+
+  ;; compojure example
+  (def my-routes
+    (routes
+      ;; your existing routes
+      (GET "/hello" [] "Hello World!")
+      ;; here you can expose the metrics to Prometheus scraping process.
+      (GET "/metrics" []
+        {:status  200
+         :headers {"Content-Type" "text/plain; version=0.0.4"}
+         :body    (prom/write-str pub)})
+      (route/not-found "<h1>Page not found</h1>")))
+
+  ;;(def x (u/start-publisher! {:type :prometheus}))
 
   )
 
@@ -328,9 +518,7 @@
     '[clojure.pprint :refer [pprint]])
 
 
-  (deftype ExamplesPublisher
-      [config buffer]
-
+  (deftype ExamplesPublisher [config buffer]
 
     com.brunobonacci.mulog.publisher.PPublisher
     (agent-buffer [_]
@@ -365,4 +553,67 @@
       {:type :inline :publisher (examples-publisher)}))
 
   (u/log ::example :foo :baz, :bar 1)
+  )
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                            ;;
+;;              ----==| T R A N S F E R   C O N T E X T |==----               ;;
+;;                                                                            ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(comment
+
+  (def p1 (u/start-publisher! {:type :console :pretty? true}))
+
+  (u/log ::hello :to "World!")
+
+  ;; {:mulog/event-name :user/hello,
+  ;;  :mulog/timestamp 1596107461713,
+  ;;  :mulog/trace-id #mulog/flake "4XP3B6hxSicK-nvYgLjvoq_AhGwrEw6I",
+  ;;  :mulog/namespace "user",
+  ;;  :to "World!"}
+
+
+  (u/with-context {:context :v1}
+    (u/log ::hello :to "World!"))
+
+  ;; {:mulog/event-name :user/hello,
+  ;;  :mulog/timestamp 1596108086680,
+  ;;  :mulog/trace-id #mulog/flake "4XP2qHapQxkd7vXqU9vseLQ2ZtCAVB_U",
+  ;;  :mulog/namespace "user",
+  ;;  :context :v1,
+  ;;  :to "World!"}
+
+
+  (u/with-context {:context :v1}
+    ;; on a different thread
+    (future
+      (u/log ::hello :to "World!")))
+
+  ;; NOTE: missing `:context :v1`
+  ;; {:mulog/event-name :user/hello,
+  ;;  :mulog/timestamp 1596108119498,
+  ;;  :mulog/trace-id #mulog/flake "4XP2sBrC4ODsG3aAGWOKW4FY4na117Wj",
+  ;;  :mulog/namespace "user",
+  ;;  :to "World!"}
+
+  (u/with-context {:context :v1}
+
+    ;; capture context
+    (let [ctx (u/local-context)]
+      ;; on a different thread
+      (future
+        ;; restore context in the different thread
+        (u/with-context ctx
+          (u/log ::hello :to "World!")))))
+
+  ;; {:mulog/event-name :user/hello,
+  ;;  :mulog/timestamp 1596108227200,
+  ;;  :mulog/trace-id #mulog/flake "4XP2yT4Kx79cWOIq0EIVOKgcm-_KbxJR",
+  ;;  :mulog/namespace "user",
+  ;;  :context :v1,
+  ;;  :to "World!"}
   )

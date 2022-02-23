@@ -21,7 +21,7 @@
 
   (publish-delay [this]
     "The number of milliseconds between two calls to `publish` function.
-     return `nil` if you don't want mu/log call the `publish` function")
+     return `nil` if you don't want μ/log call the `publish` function")
 
   (publish [this buffer]
     "publishes the items in the buffer and returns the new state of
@@ -39,9 +39,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(deftype ConsolePublisher
-    [config buffer transform]
-
+(deftype ConsolePublisher [config buffer transform]
 
   com.brunobonacci.mulog.publisher.PPublisher
   (agent-buffer [_]
@@ -76,9 +74,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(deftype SimpleFilePublisher
-    [config ^java.io.Writer filewriter buffer transform]
-
+(deftype SimpleFilePublisher [config ^java.io.Writer filewriter buffer transform]
 
   com.brunobonacci.mulog.publisher.PPublisher
   (agent-buffer [_]
@@ -92,7 +88,7 @@
   (publish [_ buffer]
     ;; items are pairs [offset <item>]
     (doseq [item (transform (map second (rb/items buffer)))]
-      (.write filewriter ^String (ut/edn-str item)))
+      (.write filewriter ^String (str (ut/edn-str item) \newline)))
     (.flush filewriter)
     (rb/clear buffer))
 
@@ -108,8 +104,9 @@
   [{:keys [filename transform] :as config}]
   {:pre [filename]}
   (let [filename (io/file filename)]
-    ;; make parte dirs
-    (.mkdirs (.getParentFile filename))
+    ;; make parent dirs
+    (when-let [path (.getParentFile filename)]
+      (.mkdirs path))
     (SimpleFilePublisher.
       config
       (io/writer filename :append true)
@@ -159,9 +156,8 @@
       (ex-info
         (str "Unable to load appropriate publisher."
           " Please ensure you have the following dependency "
-          "[com.brunobonacci/mulog-"
-          (some-> info :config :type name) " \"x.y.z\"]"
-          " in your project.clj")
+          "[" (some-> info :jar-name) " \"x.y.z\"]"
+          " in your project.clj or deps.edn")
         info cause))
 
     :init
@@ -179,12 +175,12 @@
 
 
 (defn- load-dynamic-publisher
-  [publisher-name config]
+  [publisher-name jar-name config]
   (let [;; load publisher factory function
         publisher* (try
                      (load-function-from-name publisher-name)
                      (catch Exception x
-                       (loading-error :loading {:config config} x)))
+                       (loading-error :loading {:jar-name jar-name :config config} x)))
         ;; initialize publisher
         publisher  (try (publisher* config)
                         (catch Exception x
@@ -208,7 +204,7 @@
 (defmethod publisher-factory :default
   [cfg]
   (throw
-    (ex-info "mu/log Invalid or no reporting method selected."
+    (ex-info "μ/log Invalid or no reporting method selected."
       {:type (:type cfg)
        :config cfg})))
 
@@ -216,7 +212,7 @@
 
 (defmethod publisher-factory :custom
   [{:keys [fqn-function] :as cfg}]
-  (load-dynamic-publisher fqn-function cfg))
+  (load-dynamic-publisher fqn-function "your-publisher-jar" cfg))
 
 
 
@@ -237,6 +233,15 @@
 
 
 
+(defmethod publisher-factory :console-json
+  [config]
+  (load-dynamic-publisher
+    "com.brunobonacci.mulog.publishers.console-json/json-console-publisher"
+    "com.brunobonacci/mulog-adv-console"
+    config))
+
+
+
 (defmethod publisher-factory :simple-file
   [config]
   (simple-file-publisher config))
@@ -247,6 +252,7 @@
   [config]
   (load-dynamic-publisher
     "com.brunobonacci.mulog.publishers.elasticsearch/elasticsearch-publisher"
+    "com.brunobonacci/mulog-elasticsearch"
     config))
 
 
@@ -255,6 +261,16 @@
   [config]
   (load-dynamic-publisher
     "com.brunobonacci.mulog.publishers.jvm-metrics/jvm-metrics-publisher"
+    "com.brunobonacci/mulog-jvm-metrics"
+    config))
+
+
+
+(defmethod publisher-factory :filesystem-metrics
+  [config]
+  (load-dynamic-publisher
+    "com.brunobonacci.mulog.publishers.filesystem-metrics/filesystem-metrics-publisher"
+    "com.brunobonacci/mulog-filesystem-metrics"
     config))
 
 
@@ -263,6 +279,7 @@
   [config]
   (load-dynamic-publisher
     "com.brunobonacci.mulog.publishers.kafka/kafka-publisher"
+    "com.brunobonacci/mulog-kafka"
     config))
 
 
@@ -271,6 +288,7 @@
   [config]
   (load-dynamic-publisher
     "com.brunobonacci.mulog.publishers.zipkin/zipkin-publisher"
+    "com.brunobonacci/mulog-zipkin"
     config))
 
 
@@ -279,6 +297,7 @@
   [config]
   (load-dynamic-publisher
     "com.brunobonacci.mulog.publishers.kinesis/kinesis-publisher"
+    "com.brunobonacci/mulog-kinesis"
     config))
 
 
@@ -287,6 +306,7 @@
   [config]
   (load-dynamic-publisher
     "com.brunobonacci.mulog.publishers.cloudwatch/cloudwatch-publisher"
+    "com.brunobonacci/mulog-cloudwatch"
     config))
 
 
@@ -295,4 +315,23 @@
   [config]
   (load-dynamic-publisher
     "com.brunobonacci.mulog.publishers.slack/slack-publisher"
+    "com.brunobonacci/mulog-slack"
+    config))
+
+
+
+(defmethod publisher-factory :prometheus
+  [config]
+  (load-dynamic-publisher
+    "com.brunobonacci.mulog.publishers.prometheus/prometheus-publisher"
+    "com.brunobonacci/mulog-prometheus"
+    config))
+
+
+
+(defmethod publisher-factory :mbean
+  [config]
+  (load-dynamic-publisher
+    "com.brunobonacci.mulog.publishers.mbean-sampler/mbean-sampler-publisher"
+    "com.brunobonacci/mulog-mbean-sampler"
     config))

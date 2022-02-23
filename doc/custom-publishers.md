@@ -39,7 +39,7 @@ read [μ/log internals](./mulog-internals.md).
 
   (publish-delay [this]
     "The number of milliseconds between two calls to `publish` function.
-     return `nil` if you don't want mu/log call the `publish` function")
+     return `nil` if you don't want μ/log call the `publish` function")
 
   (publish [this buffer]
     "publishes the items in the buffer and returns the new state of
@@ -87,8 +87,7 @@ events or to simply print them one per line.
             [clojure.pprint :refer [pprint]]))
 
 
-(deftype MyCustomPublisher
-    [config buffer]
+(deftype MyCustomPublisher [config buffer]
 
   com.brunobonacci.mulog.publisher.PPublisher
   (agent-buffer [_]
@@ -142,9 +141,7 @@ Now let's amend `MyCustomPublisher` to accept the filerwriter and push
 at most 1000 items.
 
 ``` clojure
-(deftype MyCustomPublisher
-  [config buffer ^java.io.Writer filewriter]
-
+(deftype MyCustomPublisher [config buffer ^java.io.Writer filewriter]
 
   com.brunobonacci.mulog.publisher.PPublisher
   (agent-buffer [_]
@@ -236,8 +233,7 @@ For example, in our previous example:
             [clojure.pprint :refer [pprint]]))
 
 
-(deftype MyCustomPublisher
-    [config buffer]
+(deftype MyCustomPublisher [config buffer]
 
   com.brunobonacci.mulog.publisher.PPublisher
   (agent-buffer [_]

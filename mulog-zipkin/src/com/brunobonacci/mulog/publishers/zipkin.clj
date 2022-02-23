@@ -11,11 +11,9 @@
 
 
 ;;
-;; OpenZipkin only accepts a 32 characters long ID for the root trace in hexadecimal format
-;; while it accepts 16 characters for a span ID (in hexadecimal format)
-
-
-
+;; OpenZipkin only accepts a 32 characters long ID for the root trace
+;; in hexadecimal format while it accepts 16 characters for a span ID
+;; (in hexadecimal format).
 ;;
 (defn- hexify
   "Returns an hexadecimal representation of a flake.
@@ -34,6 +32,18 @@
 
 
 
+(defn flag-if-error
+  "If the trace contains an error the special tag `:error` will be added."
+  [{:keys [mulog/outcome exception error] :as event}]
+  (if (and (or (= outcome :error) exception) (not error))
+    (assoc event
+      :error (if (instance? java.lang.Exception exception)
+               (.getMessage ^java.lang.Exception exception)
+               (str "Error: " exception)))
+    event))
+
+
+
 ;;
 ;; Converts μ/trace events into Zipkin traces and spans
 ;;
@@ -43,14 +53,14 @@
 (defn- prepare-records
   [config events]
   (->> events
-    (filter :mulog/root-trace)
+    (filter #(and (:mulog/root-trace %) (:mulog/duration %)))
     (map (fn [{:keys [mulog/trace-id mulog/parent-trace mulog/root-trace
-                     mulog/duration mulog/event-name mulog/timestamp
-                     app-name] :as e}]
+                      mulog/duration mulog/event-name mulog/timestamp
+                      app-name] :as e}]
            ;; zipkin IDs are much lower bits than flakes
            {:id        (hexify trace-id 16)
-            :traceId   (hexify root-trace 32)
-            :parentId  (hexify parent-trace 16)
+            :traceId   (if (f/flake? root-trace)   (hexify root-trace 32)   root-trace)
+            :parentId  (if (f/flake? parent-trace) (hexify parent-trace 16) parent-trace)
             :name      event-name
             :kind      "SERVER"
             ;; timestamp in μs
@@ -60,7 +70,9 @@
             ;; use app-name as localEndpoint if available
             :localEndpoint {:serviceName (or app-name "unknown")}
             ;; tags values must be a string (can't be maps)
-            :tags      (ut/map-values str (ut/remove-nils e))}))))
+            ;; although numbers are accepted in zipkin, they're not
+            ;; accepted in Jaeger (and maybe other).
+            :tags      (ut/map-values str (ut/remove-nils (flag-if-error e)))}))))
 
 
 
@@ -70,7 +82,6 @@
     url
     {:content-type "application/json"
      :accept :json
-     :as     :json
      :socket-timeout     publish-delay
      :connection-timeout publish-delay
      :body (json/to-json (prepare-records config records))}))
@@ -83,7 +94,22 @@
   (def publish-delay 5000)
   (def config {:url url :publish-delay publish-delay})
 
-  (def events user/sample-traces)
+  (def f1 (f/flake))
+  (def events
+    [{:mulog/event-name :mulog/sample-event
+      :mulog/timestamp  (System/currentTimeMillis)
+      :mulog/duration   242414196,
+      :mulog/namespace  "com.brunobonacci.mulog",
+      :mulog/outcome    :ok,
+      :mulog/root-trace f1
+      :mulog/trace-id   f1
+      :http-status      202
+      :factor1          3.5
+      :factor2          2/5
+      :app-name         "sample",
+      :env              "local1",
+      :version          "0.1.0"}])
+
   (post-records config events)
 
   (-> events first :mulog/root-trace (f/flake-hex) (#(subs % 0 32)))
@@ -116,9 +142,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(deftype ZipkinPublisher
-    [config buffer transform]
-
+(deftype ZipkinPublisher [config buffer transform]
 
   com.brunobonacci.mulog.publisher.PPublisher
   (agent-buffer [_]

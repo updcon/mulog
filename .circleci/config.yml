@@ -2,12 +2,35 @@ version: 2
 jobs:
   build:
     machine:
-      image: ubuntu-1604:202004-01
+      image: ubuntu-2004:202008-01
     working_directory: ~/repo
 
     environment:
       LEIN_ROOT: "true"
+      AWS_REGION: "eu-west-1"
+      AWS_ACCESS_KEY_ID: "localstack"
+      AWS_SECRET_ACCESS_KEY: "localstack"
 
     steps:
       - checkout
+      - run:
+          name: Dependencies list
+          command: |
+            cat $(find . -name project.clj | sort) > /tmp/all-projects.clj
+
+      - restore_cache:
+          keys:
+            # when lock file changes, use increasingly general patterns to restore cache
+            #- maven-repo-v1-{{ .Branch }}-{{ checksum "pom.xml" }}
+            - maven-repo-v1-{{ .Branch }}-
+            - maven-repo-v1-
+
       - run: make all
+
+      # don't cache local artifacts
+      - run: rm -fr ~/.m2/repository/com/brunobonacci/
+
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: maven-repo-v1-{{ .Branch }}-{{ checksum "/tmp/all-projects.clj" }}

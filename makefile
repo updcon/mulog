@@ -8,7 +8,7 @@ define helpdoc
 # |                  MM    MM    ,M'    MM 6W'   `Wb :MI  I8                   |
 # |                  MM    MM    MV     MM 8M     M8  WmmmP"                   |
 # |                  MM    MM   AW      MM YA.   ,A9 8M                        |
-# |                  MVbgd"'Ybo,M'    .JMML.`Ybmd9'   YMMMMMb                  |
+# |                  MVbgd"'Mb ,M'    .JMML.`Ybmd9'   YMMMMMb                  |
 # |                  M.        MV                    6'     dP                 |
 # |                  M8       AW                     Ybmmmd'                   |
 # |                                                                            |
@@ -32,9 +32,11 @@ define helpdoc
 #
 # - clean:   removes compilation outputs
 # - build:   compiles and run unit tests for each modules
+# - prep:    prep for release: same as `make clean ancient format build`
 # - deploy:  it deploys the jars into clojar (FOR RELEASE ONLY)
 # - ancient: updates all the dependencies
-# - all:     same as `make ancient clean build`
+# - format:  re-format source code across all modules
+# - all:     same as `make clean build`
 #
 endef
 
@@ -54,15 +56,24 @@ help:
 
 
 #
-# Preparing all
+# all
 #
-all: ancient clean build
+all:  clean build
+
+
+#
+# prep
+#
+prep: clean ancient format build
 
 
 #
 # Build
 #
-build: build-core build-json build-els build-jvm-metrics build-kafka build-kinesis build-cloudwatch build-slack build-zipkin build-examples
+MULOG_MODULES := build-core build-json build-jvm-metrics build-filesystem-metrics build-mbean-sampler
+MULOG_MODULES += build-adv-console build-cloudwatch build-els build-kafka build-kinesis build-prometheus
+MULOG_MODULES += build-slack build-zipkin build-examples
+build: $(MULOG_MODULES)
 - @printf "#\n# Building μ/log Completed!\n#\n"
 
 
@@ -107,6 +118,36 @@ mulog-jvm-metrics/target/mulog*.jar: $(jvm-metrics_src)
 
 
 #
+# Build filesystem-metrics
+#
+filesystem-metrics_src = $(shell find mulog-filesystem-metrics/project.clj mulog-filesystem-metrics/src mulog-filesystem-metrics/resources -type f)
+build-filesystem-metrics: build-core mulog-filesystem-metrics/target/mulog*.jar
+mulog-filesystem-metrics/target/mulog*.jar: $(filesystem-metrics_src)
+- @printf "#\n# Building mulog-filesystem-metrics\n#\n"
+- (cd mulog-filesystem-metrics; lein do check, test, install)
+
+
+#
+# Build mbean-sampler
+#
+mbean-sampler_src = $(shell find mulog-mbean-sampler/project.clj mulog-mbean-sampler/src mulog-mbean-sampler/resources -type f)
+build-mbean-sampler: build-core mulog-mbean-sampler/target/mulog*.jar
+mulog-mbean-sampler/target/mulog*.jar: $(mbean-sampler_src)
+- @printf "#\n# Building mulog-mbean-sampler\n#\n"
+- (cd mulog-mbean-sampler; lein do check, test, install)
+
+
+#
+# Build adv-console
+#
+adv_console_src = $(shell find mulog-adv-console/project.clj mulog-adv-console/src mulog-adv-console/resources -type f)
+build-adv-console: build-core build-json mulog-adv-console/target/mulog*.jar
+mulog-adv-console/target/mulog*.jar: $(adv_console_src)
+- @printf "#\n# Building mulog-adv-console\n#\n"
+- (cd mulog-adv-console; lein do check, test, install)
+
+
+#
 # Build kafka
 #
 kafka_src = $(shell find mulog-kafka/project.clj mulog-kafka/src mulog-kafka/resources -type f)
@@ -123,7 +164,7 @@ kinesis_src = $(shell find mulog-kinesis/project.clj mulog-kinesis/src mulog-kin
 build-kinesis: build-core mulog-kinesis/target/mulog*.jar
 mulog-kinesis/target/mulog*.jar: $(kinesis_src)
 - @printf "#\n# Building mulog-kinesis\n#\n"
-- (cd mulog-kinesis; lein do check, install) # TODO: fix Region error and add test
+- (cd mulog-kinesis; lein do check, test, install)
 
 
 #
@@ -133,7 +174,7 @@ cloudwatch_src = $(shell find mulog-cloudwatch/project.clj mulog-cloudwatch/src 
 build-cloudwatch: build-core mulog-cloudwatch/target/mulog*.jar
 mulog-cloudwatch/target/mulog*.jar: $(cloudwatch_src)
 - @printf "#\n# Building mulog-cloudwatch\n#\n"
-- (cd mulog-cloudwatch; lein do check, install) # TODO: fix Region error and add test
+- (cd mulog-cloudwatch; lein do check, test, install)
 
 
 #
@@ -154,6 +195,16 @@ build-zipkin: build-core mulog-zipkin/target/mulog*.jar
 mulog-zipkin/target/mulog*.jar: $(zipkin_src)
 - @printf "#\n# Building mulog-zipkin\n#\n"
 - (cd mulog-zipkin; lein do check, test, install)
+
+
+#
+# Build prometheus
+#
+prometheus_src = $(shell find mulog-prometheus/project.clj mulog-prometheus/src mulog-prometheus/resources -type f)
+build-prometheus: build-core mulog-prometheus/target/mulog*.jar
+mulog-prometheus/target/mulog*.jar: $(prometheus_src)
+- @printf "#\n# Building mulog-prometheus\n#\n"
+- (cd mulog-prometheus; lein do check, test, install)
 
 
 #
@@ -181,11 +232,36 @@ deploy:
 - (cd mulog-json;                 lein deploy clojars)
 - (cd mulog-elasticsearch;        lein deploy clojars)
 - (cd mulog-jvm-metrics;          lein deploy clojars)
+- (cd mulog-filesystem-metrics;   lein deploy clojars)
+- (cd mulog-mbean-sampler;        lein deploy clojars)
+- (cd mulog-adv-console;          lein deploy clojars)
 - (cd mulog-kafka;                lein deploy clojars)
 - (cd mulog-kinesis;              lein deploy clojars)
 - (cd mulog-cloudwatch;           lein deploy clojars)
 - (cd mulog-slack;                lein deploy clojars)
 - (cd mulog-zipkin;               lein deploy clojars)
+- (cd mulog-prometheus;           lein deploy clojars)
+
+
+#
+# Download dependencies from Clojars and Maven
+#
+.PHONY: deps
+deps:
+- @printf "#\n# Downloading Dependencies \n#\n"
+- (cd mulog-core;                 lein deps)
+- (cd mulog-json;                 lein deps)
+- (cd mulog-elasticsearch;        lein deps)
+- (cd mulog-jvm-metrics;          lein deps)
+- (cd mulog-filesystem-metrics;   lein deps)
+- (cd mulog-mbean-sampler;        lein deps)
+- (cd mulog-adv-console;          lein deps)
+- (cd mulog-kafka;                lein deps)
+- (cd mulog-kinesis;              lein deps)
+- (cd mulog-cloudwatch;           lein deps)
+- (cd mulog-slack;                lein deps)
+- (cd mulog-zipkin;               lein deps)
+- (cd mulog-prometheus;           lein deps)
 
 
 #
@@ -198,12 +274,38 @@ ancient:
 - (cd mulog-json;                 lein with-profile tools ancient upgrade ; lein do clean, install)
 - (cd mulog-elasticsearch;        lein with-profile tools ancient upgrade ; lein do clean, install)
 - (cd mulog-jvm-metrics;          lein with-profile tools ancient upgrade ; lein do clean, install)
+- (cd mulog-filesystem-metrics;   lein with-profile tools ancient upgrade ; lein do clean, install)
+- (cd mulog-mbean-sampler;        lein with-profile tools ancient upgrade ; lein do clean, install)
+- (cd mulog-adv-console;          lein with-profile tools ancient upgrade ; lein do clean, install)
 - (cd mulog-kafka;                lein with-profile tools ancient upgrade ; lein do clean, install)
 - (cd mulog-kinesis;              lein with-profile tools ancient upgrade ; lein do clean, install)
 - (cd mulog-cloudwatch;           lein with-profile tools ancient upgrade ; lein do clean, install)
 - (cd mulog-slack;                lein with-profile tools ancient upgrade ; lein do clean, install)
 - (cd mulog-zipkin;               lein with-profile tools ancient upgrade ; lein do clean, install)
+- (cd mulog-prometheus;           lein with-profile tools ancient upgrade ; lein do clean, install)
 - (cd examples/roads-disruptions; lein with-profile tools ancient upgrade ; lein do clean, install)
+
+
+#
+# uniforms formatting on all sources
+#
+.PHONY: format
+format:
+- @printf "#\n# Re-Format source code \n#\n"
+- (cd mulog-core;                 lein with-profile tools cljfmt fix)
+- (cd mulog-json;                 lein with-profile tools cljfmt fix)
+- (cd mulog-elasticsearch;        lein with-profile tools cljfmt fix)
+- (cd mulog-jvm-metrics;          lein with-profile tools cljfmt fix)
+- (cd mulog-filesystem-metrics;   lein with-profile tools cljfmt fix)
+- (cd mulog-mbean-sampler;        lein with-profile tools cljfmt fix)
+- (cd mulog-adv-console;          lein with-profile tools cljfmt fix)
+- (cd mulog-kafka;                lein with-profile tools cljfmt fix)
+- (cd mulog-kinesis;              lein with-profile tools cljfmt fix)
+- (cd mulog-cloudwatch;           lein with-profile tools cljfmt fix)
+- (cd mulog-slack;                lein with-profile tools cljfmt fix)
+- (cd mulog-zipkin;               lein with-profile tools cljfmt fix)
+- (cd mulog-prometheus;           lein with-profile tools cljfmt fix)
+- (cd examples/roads-disruptions; lein with-profile tools cljfmt fix)
 
 
 #
@@ -216,9 +318,13 @@ clean:
 - (cd mulog-json;                 rm -fr target)
 - (cd mulog-elasticsearch;        rm -fr target)
 - (cd mulog-jvm-metrics;          rm -fr target)
+- (cd mulog-filesystem-metrics;   rm -fr target)
+- (cd mulog-mbean-sampler;        rm -fr target)
+- (cd mulog-adv-console;          rm -fr target)
 - (cd mulog-kafka;                rm -fr target)
 - (cd mulog-kinesis;              rm -fr target)
 - (cd mulog-cloudwatch;           rm -fr target)
 - (cd mulog-slack;                rm -fr target)
 - (cd mulog-zipkin;               rm -fr target)
+- (cd mulog-prometheus;           rm -fr target)
 - (cd examples/roads-disruptions; rm -fr target)

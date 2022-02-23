@@ -4,25 +4,14 @@
             [com.brunobonacci.mulog.utils :as ut]
             [com.brunobonacci.mulog.common.json :as json]
             [clj-http.client :as http]
-            [clj-time.format :as tf]
-            [clj-time.coerce :as tc]
             [clojure.string :as str]))
-
-
-
-(defn- unix-ms-to-iso8601
-  [unix-ms]
-  (let [iso-8601-fmt (tf/formatters :date-time)]
-    (->> unix-ms
-      (tc/from-long)
-      (tf/unparse iso-8601-fmt))))
 
 
 
 (defn- default-render-message
   "Timestamp and event name with the log content in a code block"
   [event]
-  (let [timestamp (unix-ms-to-iso8601 (:mulog/timestamp event))
+  (let [timestamp (ut/iso-datetime-from-millis (:mulog/timestamp event))
         event-name (:mulog/event-name event)]
     (str timestamp " - " event-name
       \newline
@@ -52,8 +41,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(deftype SlackPublisher
-    [config buffer]
+(deftype SlackPublisher [config buffer]
 
   com.brunobonacci.mulog.publisher.PPublisher
   (agent-buffer [_]
@@ -70,13 +58,15 @@
           transformed-events (transform (map second items))
           render-message (:render-message config)
           rendered-messages (map render-message transformed-events)]
-      (if-not (seq items)
-        buffer
-        (do
-          (send-slack-message (:webhook-url config)
-            (str/join "\n" rendered-messages)
-            (:publish-delay config))
-          (rb/dequeue buffer last-offset))))))
+      ;; if the are rendered events, then send them
+      (when (seq rendered-messages)
+        (send-slack-message (:webhook-url config)
+          (str/join "\n" rendered-messages)
+          (:publish-delay config)))
+      ;; discard the events we processed
+      (if (seq items)
+        (rb/dequeue buffer last-offset)
+        buffer))))
 
 
 

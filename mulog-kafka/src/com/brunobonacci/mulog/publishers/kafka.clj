@@ -3,19 +3,21 @@
             [com.brunobonacci.mulog.buffer :as rb]
             [com.brunobonacci.mulog.utils :as ut]
             [com.brunobonacci.mulog.common.json :as json]
-            [clojure.string :as str])
+            [clojure.string :as str]
+            [taoensso.nippy :as nippy])
   (:import [java.util Map]
            [org.apache.kafka.clients.producer KafkaProducer ProducerRecord RecordMetadata]
-           [org.apache.kafka.common.serialization StringSerializer Serializer]))
-
+           [org.apache.kafka.common.serialization StringSerializer Serializer
+            ByteArraySerializer]))
 
 
 
 (defn- normalize-config
-  [config]
+  [{:keys [format] :as config}]
   (->> config
+    :kafka
     (merge {:key.serializer   StringSerializer
-            :value.serializer StringSerializer})
+            :value.serializer (if (= :nippy format) ByteArraySerializer StringSerializer)})
     (map (fn [[k v]]
            [(name k)
             (cond
@@ -56,11 +58,11 @@
 
 (comment
 
-  (def kcfg {:bootstrap.servers "192.168.200.200:9092"
+  (def kcfg {:bootstrap.servers "localhost:9092"
              :key.serializer    StringSerializer
              :value.serializer  StringSerializer})
 
-  (def kp (producer kcfg))
+  (def kp (producer {:kafka kcfg}))
 
   (RecordMetadata->data @(send! kp "mulog" "key1" "value1"))
 
@@ -70,12 +72,11 @@
 
 ;; TODO: handle records which can't be serialized.
 (defn- publish-records!
-  [{:keys [key-field format topic producer*] :as  config} records]
-  (let [fmt* (if (= :json format) json/to-json ut/edn-str)]
-    (->> records
-      (map (juxt #(get % key-field) fmt*))
-      (map (fn [[k v]] (send! producer* topic k v)))
-      (doall))))
+  [{:keys [key-field format topic producer* fmt*] :as  config} records]
+  (->> records
+    (map (juxt #(some-> (get % key-field) str) fmt*))
+    (map (fn [[k v]] (send! producer* topic k v)))
+    (doall)))
 
 
 
@@ -87,18 +88,6 @@
 
 
 
-(defn deep-merge
-  "Like merge, but merges maps recursively. It merges the maps from left
-  to right and the right-most value wins. It is useful to merge the
-  user defined configuration on top of the default configuration."
-  [& maps]
-  (let [maps (filter (comp not nil?) maps)]
-    (if (every? map? maps)
-      (apply merge-with deep-merge maps)
-      (last maps))))
-
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                                                                            ;;
 ;;                         ----==| K A F K A |==----                          ;;
@@ -106,9 +95,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(deftype KafkaPublisher
-    [config buffer transform]
-
+(deftype KafkaPublisher [config buffer transform]
 
   com.brunobonacci.mulog.publisher.PPublisher
   (agent-buffer [_]
@@ -137,7 +124,7 @@
 
 
 
-(def ^:const DEFAULT-CONFIG
+(def DEFAULT-CONFIG
   {:max-items     1000
    :publish-delay 1000
    :kafka         {;; the comma-separated list of brokers to connect
@@ -145,12 +132,25 @@
                    ;; you can add more kafka connection properties here
                    }
    :topic         "mulog"
-   ;; one of: :json, :edn
+   ;; one of: :json, :edn, :nippy
    :format        :json
+   ;; nippy configuration
+   :nippy         {:compressor nippy/lz4-compressor}
+   ;; kafka records key
    :key-field     :mulog/trace-id
    ;; function to transform records
    :transform     identity
    })
+
+
+
+(defn- serialization-format
+  [{:keys [format nippy] :as config}]
+  (case format
+    :json json/to-json
+    :edn ut/edn-str
+    :nippy #(nippy/freeze % nippy)
+    json/to-json))
 
 
 
@@ -159,7 +159,8 @@
   {:pre [(get-in config [:kafka :bootstrap.servers])]}
   (KafkaPublisher.
     (as-> config $
-      (deep-merge DEFAULT-CONFIG $)
-      (assoc $ :producer* (producer (:kafka $))))
+      (ut/deep-merge DEFAULT-CONFIG $)
+      (assoc $ :producer* (producer $))
+      (assoc $ :fmt* (serialization-format $)))
     (rb/agent-buffer 10000)
     (or (:transform config) identity)))

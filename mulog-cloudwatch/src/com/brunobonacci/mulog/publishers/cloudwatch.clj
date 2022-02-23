@@ -5,6 +5,11 @@
             [com.brunobonacci.mulog.common.json :as json]
             [cognitect.aws.client.api :as aws]))
 
+;;
+;; On CloudWatchLogs, the following constrain must be respected.
+;; "Log events in a single PutLogEvents request must be in chronological order."
+;;
+;;
 
 
 (defn- has-invalid-token?
@@ -37,24 +42,27 @@
 
 (defn- publish!
   [cloudwatch-client group-name stream-name records next-token]
-  (let [rq {:logGroupName  group-name
-            :logStreamName stream-name
-            :logEvents     records}
+  (let [rq    {:logGroupName  group-name
+               :logStreamName stream-name
+               :logEvents     records}
         token @next-token
-        rs  (aws/invoke cloudwatch-client {:op  :PutLogEvents
-                                           :request (if (nil? token)
-                                                      rq
-                                                      (merge rq token))})]
+        rs    (aws/invoke cloudwatch-client {:op      :PutLogEvents
+                                             :request (if (nil? token)
+                                                        rq
+                                                        (merge rq token))})]
 
     (if (has-anomaly? rs)
       (if (has-invalid-token? rs)
         (swap! next-token assoc :sequenceToken (:expectedSequenceToken rs))
         (throw
           (ex-info
-            (str "μ/log cloudwatch publisher publish failure, group '"
-              group-name "'" " stream '"
-              stream-name "' reason '" (:message rs) "'")
-            {:rs rs})))
+            (format "μ/log cloudwatch publisher publish failure, group '%s' stream '%s' reason: %s "
+              (str group-name)
+              (str stream-name)
+              (str (:message rs)))
+            {:rs          rs
+             :group-name  group-name
+             :stream-name stream-name})))
       (swap! next-token assoc :sequenceToken (:nextSequenceToken rs)))))
 
 
@@ -63,7 +71,8 @@
   [cw-client stream-name {:keys [group-name] :as config} records  next-token]
   (let [request  (->> records
                    (map (juxt #(get % :mulog/timestamp) json/to-json))
-                   (map (fn [[k v]] {:timestamp k :message v})))]
+                   (map (fn [[k v]] {:timestamp k :message v}))
+                   (sort-by :timestamp))]
     (publish! cw-client group-name stream-name request  next-token)))
 
 
@@ -74,8 +83,7 @@
 ;;                                                                                ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(deftype CloudwatchPublisher
-    [config buffer transform cw-client stream-name next-token]
+(deftype CloudwatchPublisher [config buffer transform cw-client stream-name next-token]
 
   com.brunobonacci.mulog.publisher.PPublisher
   (agent-buffer [_]
@@ -120,12 +128,13 @@
     (if (has-anomaly? rs)
       (throw
         (ex-info
-          (format (str "μ/log cloudwatch publisher initialization failure,"
-                  " group: '%s', stream: '%s', reason: %s")
+          (format "μ/log cloudwatch publisher initialization failure, group: '%s', stream: '%s', reason: %s"
             (str group-name)
             (str stream-name)
             (:message rs))
-          {:rs rs}))
+          {:rs          rs
+           :group-name  group-name
+           :stream-name stream-name}))
       (CloudwatchPublisher.
         cfg
         (rb/agent-buffer 10000)

@@ -6,7 +6,7 @@ This namespace contains the implementation of a ring-buffer and a
 wrapper agent used to buffer the events before their are published
 to the downstream systems by the publishers.
 "}
-    com.brunobonacci.mulog.buffer
+ com.brunobonacci.mulog.buffer
   (:require [amalloy.ring-buffer :as rb])
   (:import [java.util.concurrent ScheduledThreadPoolExecutor
             TimeUnit ScheduledFuture Future ThreadFactory]))
@@ -90,26 +90,46 @@ to the downstream systems by the publishers.
     ^ThreadFactory
     (reify ThreadFactory
       (^Thread newThread [this ^Runnable r]
-       (let [t (Thread. r)]
-         (.setName   t (str "mu/log-task-" (.getId t)))
-         (.setDaemon t true)
-         t)))))
+        (let [t (Thread. r)]
+          (.setName   t (str "μ/log-task-" (.getId t)))
+          (.setDaemon t true)
+          t)))))
+
+
+
+(defmacro ignore
+  "ignores exceptions occurring in the body"
+  {:no-doc true :private true}
+  [& body]
+  `(try
+     ~@body
+     (catch Exception x#
+       x#)))
 
 
 
 (defonce timer-pool
-  (scheduled-thread-pool 2))
+  (delay ;; Delay the thread pool initialisation at runtime (GraalVM)
+    (scheduled-thread-pool 2)))
 
 
 
 (defn recurring-task
-  [delay-millis task]
-  (let [^ScheduledFuture ftask
-        (.scheduleAtFixedRate
-          ^ScheduledThreadPoolExecutor timer-pool
-          (fn [] (try (task) (catch Exception x))) ;; TODO log errors, this shouldn't happen
-          delay-millis delay-millis TimeUnit/MILLISECONDS)]
-    (fn [] (.cancel ftask true))))
+  ([delay-millis task]
+   (recurring-task delay-millis task nil))
+  ([delay-millis task error-logger]
+   (let [^ScheduledFuture ftask
+         (.scheduleAtFixedRate
+           ^ScheduledThreadPoolExecutor @timer-pool
+           (fn []
+             (try
+               (task)
+               (catch Exception x
+                 (when error-logger
+                   (ignore ;; ignore errors during logging
+                     (error-logger x))))))
+           delay-millis delay-millis TimeUnit/MILLISECONDS)]
+     (fn [] (.cancel ftask true)))))
 
 
 

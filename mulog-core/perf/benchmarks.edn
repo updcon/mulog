@@ -1,6 +1,7 @@
 {:benchmarks
  [benchmarks/log-call-simple
   benchmarks/log-call-with-context
+  benchmarks/log-call-with-context2
   benchmarks/trace-call-simple
   benchmarks/trace-call-with-capture
   benchmarks/flake-creation
@@ -12,6 +13,9 @@
 
  :options
  {:jmh/default
-  {:mode [:average #_:single-shot #_:throughput #_:samples #_:all]
-   :output-time-unit :ns}}
+  {:mode             [:average #_:single-shot #_:throughput #_:samples #_:all]
+   :output-time-unit :ns
+   :fork             15
+   :measurement      10
+   :warmup           {:time [10 :seconds]}}}
  }

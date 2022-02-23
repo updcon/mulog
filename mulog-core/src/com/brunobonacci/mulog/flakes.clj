@@ -67,7 +67,7 @@
         Overhead used : 1.881732 ns
 
   "}
-    com.brunobonacci.mulog.flakes
+ com.brunobonacci.mulog.flakes
   (:import com.brunobonacci.mulog.core.Flake))
 
 
@@ -105,6 +105,13 @@
   [f ^java.io.Writer w]
   (.write w "#mulog/flake ")
   (print-method (str f) w))
+
+
+
+(defn flake?
+  "returns true if `f` is an instance of a Flake."
+  [f]
+  (instance? Flake f))
 
 
 

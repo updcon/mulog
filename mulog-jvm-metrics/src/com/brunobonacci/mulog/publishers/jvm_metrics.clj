@@ -1,6 +1,6 @@
 (ns ^{:author "Pablo Reszczynski (@PabloReszczynski) and Bruno Bonacci (@BrunoBonacci)"
       :doc "Publisher for sampling some JVM metrics"}
-    com.brunobonacci.mulog.publishers.jvm-metrics
+ com.brunobonacci.mulog.publishers.jvm-metrics
   (:require [clojure.spec.alpha :as s]
             [clojure.string :as str]
             [com.brunobonacci.mulog.utils :refer [os-java-pid]]
@@ -66,9 +66,18 @@
 
 
 
+(defn div
+  "If denominator is zero it returns 0, instead of an exception"
+  [num den]
+  (if (== den 0)
+    0
+    (/ num den)))
+
+
+
 (defn- get-usage-ratio [^MemoryUsage usage]
   (fix-precision-ratio
-    (/ (.getUsed usage)
+    (div (.getUsed usage)
       (if (= (.getMax usage) -1)
         (.getCommitted usage)
         (.getMax usage)))))
@@ -140,11 +149,7 @@
           :let [pname (get-bean-name pool)
                 usage (.getUsage pool)]]
       [(keyword (str pname "-usage"))
-       (fix-precision-ratio
-         (/ (.getUsed usage)
-           (if (= (.getMax usage) -1)
-             (.getCommitted usage)
-             (.getMax usage))))])))
+       (get-usage-ratio usage)])))
 
 
 
@@ -174,12 +179,14 @@
 
 
 (defn- capture-jvm-attrs [^RuntimeMXBean runtime]
-  {:name (.getName runtime)
-   :vendor (format "%s (%s)"
-             (.getVmVendor runtime)
-             (.getSpecVersion runtime))
-   :version (.getVmVersion runtime)
-   :process-id (os-java-pid)})
+  {:name       (.getName runtime)
+   :vendor     (format "%s (%s)" (.getVmVendor runtime) (.getSpecVersion runtime))
+   :version    (.getVmVersion runtime)
+   :process-id (os-java-pid)
+   :os-name    (System/getProperty "os.name" "n/a")
+   :os-arch    (System/getProperty "os.arch" "n/a")
+   :os-version (System/getProperty "os.version" "n/a")})
+
 
 
 (s/fdef capture-jvx-attrs
@@ -315,14 +322,25 @@
 
 
 
+(defn publish-sample
+  [{:keys [jvm-metrics transform-samples] :as config}]
+  (let [;; collect the sample
+        raw-sample (jvm-sample jvm-metrics)
+        ;; apply custom transformation
+        samples (transform-samples [raw-sample])]
+    ;; publish the sample
+    (doseq [sample samples]
+      (u/log :mulog/jvm-metrics-sampled :jvm-metrics sample))))
+
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                                                                            ;;
 ;;                     ----==| P U B L I S H E R |==----                      ;;
 ;;                                                                            ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(deftype JvmMetricsPublisher
-    [config buffer]
+(deftype JvmMetricsPublisher [config buffer]
 
   com.brunobonacci.mulog.publisher.PPublisher
   (agent-buffer [_]
@@ -333,8 +351,7 @@
 
   (publish [_ buffer]
     ;; sampling the jvm metrics
-    (u/log :mulog/jvm-metrics-sampled
-      :jvm-metrics (jvm-sample (:jvm-metrics config)))))
+    (publish-sample config)))
 
 
 
@@ -342,7 +359,14 @@
   {;; Interval in milliseconds between two samples
    :sampling-interval 60000
    ;; metrics to sample
-   :jvm-metrics {:memory true :gc true :threads true :jvm-attrs true}})
+   :jvm-metrics {:memory true :gc true :threads true :jvm-attrs true}
+
+   ;; Transformation to apply to the samples before publishing.
+   ;;
+   ;; It is a function that takes a sequence of samples and
+   ;; returns and updated sequence of samples:
+   ;; `transform-samples -> sample-seq -> sample-seq`
+   :transform-samples identity})
 
 
 
@@ -350,7 +374,14 @@
   [{:keys [sampling-interval jvm-metrics] :as config}]
   (let [config (as-> config $
                  (merge DEFAULT-CONFIG $)
-                 (assoc $ :sampling-interval
-                   (max sampling-interval 1000)))]
+                 (update $ :transform-samples #(or % identity))
+                 ;; sampling interval shouldn't be too small
+                 (update $ :sampling-interval max  1000))]
     ;; create the metrics publisher
-    (JvmMetricsPublisher. config (rb/agent-buffer 1))))
+    (JvmMetricsPublisher. config (rb/agent-buffer 500))))
+
+
+
+(comment
+  (jvm-sample {:memory true :gc true :threads true :jvm-attrs true})
+  )

@@ -6,23 +6,20 @@
             [com.brunobonacci.mulog.common.json :as json]
             [clj-http.client :as http]
             [clojure.string :as str]
-            [clj-time.format :as tf]
-            [clj-time.coerce :as tc]
-            [clojure.walk :as w]))
+            [clojure.walk :as w])
+  (:import [java.time Instant ZoneId]
+           [java.time.format DateTimeFormatter]))
 
 
 
-(def date-time-formatter
-  "the ISO8601 date format with milliseconds"
-  (tf/formatters :date-time))
-
-
-
-(defn format-date-from-long
-  [timestamp]
-  (->> timestamp
-    (tc/from-long)
-    (tf/unparse date-time-formatter)))
+(defn- utc-formatter
+  "Given a pattern returns a function which takes a timestamp in milliseconds
+   and returns a formatted string with the given pattern in UTC time."
+  [pattern]
+  (let [formatter (-> (DateTimeFormatter/ofPattern pattern)
+                    (.withZone (ZoneId/of "UTC")))]
+    (fn [^long timestamp]
+      (.format formatter (Instant/ofEpochMilli timestamp)))))
 
 
 
@@ -35,12 +32,31 @@
 
 
 
-(defn- index-name
-  ([]
-   (index-name "'mulog-'yyyy.MM.dd"))
-  ([pattern]
-   (let [fmt (tf/formatter pattern)]
-     (fn [ts] (tf/unparse fmt (tc/from-long ts))))))
+(defmulti index-name
+  "it return a function that applied to the record given an event
+  timestamp in milliseconds returns the name of the index where to
+  store the record.
+
+  When using `:index-pattern \"'mulog-'yyyy.MM.dd'\"` it replace the date
+  pattern with the date based on the timestamp.
+
+  When using `:data-stream \"mulog-stream\"` it always returns the name
+  of the stream.
+  "
+  first)
+
+
+
+(defmethod index-name :index-pattern [[_ v]]
+  {:op :index :index* (utc-formatter v)})
+
+
+
+(defmethod index-name :data-stream [[_ v]] {:op :create :index* (constantly v)})
+
+
+
+(defmethod index-name :default [_] (index-name [:index-pattern "'mulog-'yyyy.MM.dd"]))
 
 
 
@@ -67,7 +83,7 @@
 
 
 (defn- prepare-records
-  [{:keys [index* name-mangling els-version] :as config} records]
+  [{:keys [op index* name-mangling els-version]} records]
   (let [mangler (if name-mangling mangle-map identity)]
     (->> records
       (mapcat (fn [{:keys [mulog/timestamp mulog/trace-id] :as r}]
@@ -77,11 +93,11 @@
                                 (when trace-id {:_id (str trace-id)})
                                 ;; https://www.elastic.co/guide/en/elasticsearch/reference/7.x/removal-of-types.html
                                 (when (= els-version :v6.x) {:_type "_doc"}))]
-                  [(str (json/to-json {:index metaidx}) \newline)
+                  [(str (json/to-json (hash-map op metaidx)) \newline)
                    (-> r
                      (mangler)
                      (dissoc :mulog/timestamp)
-                     (assoc "@timestamp" (format-date-from-long timestamp))
+                     (assoc "@timestamp" (ut/iso-datetime-from-millis timestamp))
                      (ut/remove-nils)
                      (json/to-json)
                      (#(str % \newline)))]))))))
@@ -89,57 +105,73 @@
 
 
 (defn- post-records
-  [{:keys [url publish-delay] :as config} records]
-  (http/post
-    (normalize-endpoint-url url)
-    {:content-type "application/x-ndjson"
-     :accept :json
-     :as :json
-     :socket-timeout publish-delay
-     :connection-timeout publish-delay
-     :body
-     (->> (prepare-records config records)
-       (apply str))}))
+  [{:keys [url publish-delay http-opts] :as config} records]
+  (-> (http/post
+        (normalize-endpoint-url url)
+        (merge
+          http-opts
+          {:content-type "application/x-ndjson"
+           :accept :json
+           :socket-timeout publish-delay
+           :connection-timeout publish-delay
+           :body
+           (->> (prepare-records config records)
+             (apply str))}))
+    (update :body json/from-json)))
 
 
 
 (defn detect-els-version
   "It contacts the ELS API and retrieve the major version group"
-  [url]
+  [url http-opts]
   (some->
     (http/get
       url
-      {:content-type "application/json"
-       :accept :json
-       :as :json
-       :socket-timeout 500
-       :connection-timeout 500
-       :throw-exceptions false
-       :ignore-unknown-host? true})
+      (merge http-opts
+        {:content-type "application/json"
+         :accept :json
+         :socket-timeout 500
+         :connection-timeout 500
+         :throw-exceptions false
+         :ignore-unknown-host? true}))
     :body
+    json/from-json
     :version
     :number
     (str/split #"\.")
     first
     (#(format "v%s.x" %))
-    (keyword)))
+    keyword))
 
 
 
 (comment
 
+
+  (apply-defaults {:url "http://localhost:9200" :data-stream "mulog-stream"})
+
+
   (prepare-records
-    {:url "http://localhost:9200/_bulk"
-     :index* (index-name)
-     :name-mangling true}
+    (apply-defaults
+      {:url "http://localhost:9200/_bulk"
+       :name-mangling true})
     [{:mulog/timestamp (System/currentTimeMillis) :event-name :hello :k 1}
      {:mulog/timestamp (System/currentTimeMillis) :event-name :hello :k nil}])
 
 
   (post-records
-    {:url "http://localhost:9200/_bulk"
-     :index* (index-name)
-     :name-mangling true}
+    (apply-defaults
+      {:url "http://localhost:9200"
+       :data-stream "mulog-stream"
+       :name-mangling true})
+    [{:mulog/timestamp (System/currentTimeMillis) :event-name :hello :k 1 :r1 (rand) :r2 (rand-int 100)}
+     {:mulog/timestamp (System/currentTimeMillis) :event-name :hello :k nil :r1 (rand) :r2 (rand-int 100)}])
+
+
+  (post-records
+    (apply-defaults
+      {:url "http://localhost:9200/_bulk"
+       :name-mangling true})
     [{:mulog/timestamp (System/currentTimeMillis) :event-name :hello :k 1 :r1 (rand) :r2 (rand-int 100)}
      {:mulog/timestamp (System/currentTimeMillis) :event-name :hello :k nil :r1 (rand) :r2 (rand-int 100)}])
   )
@@ -153,9 +185,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(deftype ElasticsearchPublisher
-    [config buffer transform]
-
+(deftype ElasticsearchPublisher [config buffer transform]
 
   com.brunobonacci.mulog.publisher.PPublisher
   (agent-buffer [_]
@@ -174,7 +204,8 @@
         buffer
         ;; else send to ELS
         (do
-          (post-records config (transform (map second items)))
+          (some->> (seq (transform (map second items)))
+            (post-records config))
           (rb/dequeue buffer last-offset))))))
 
 
@@ -184,23 +215,40 @@
    ;; :url "http://localhost:9200/" ;; REQUIRED
    :max-items     5000
    :publish-delay 5000
-   :index-pattern "'mulog-'yyyy.MM.dd"
    :name-mangling true
+   ;; Choose between `:index-pattern` or `:data-stream`, the default is `:index-pattern`
+   ;; The pattern uses the Java DateTimeFormatter format:
+   ;; see: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/time/format/DateTimeFormatter.html
+   ;; :index-pattern "'mulog-'yyyy.MM.dd"
+   ;;
+   ;; data streams are available since Elasticsearch 7.9
+   ;; :data-stream   "mulog-stream"
+   ;; extra http options
+   :http-opts {}
    :els-version   :auto   ;; one of: `:v6.x`, `:v7.x`, `:auto`
    ;; function to transform records
-   :transform     identity
-   })
+   :transform     identity})
+
+
+
+(defn- apply-defaults [{:keys [url] :as config}]
+  {:pre [url]}
+  (as-> config $
+    (merge DEFAULT-CONFIG
+      $
+      (-> (select-keys $ [:index-pattern :data-stream]) first index-name))
+    ;; autodetect version when set to `:auto`
+    (update $ :els-version
+      (fn [v] (if (= v :auto)
+                (or (detect-els-version url (:http-opts $)) :v7.x)
+                v)))))
 
 
 
 (defn elasticsearch-publisher
-  [{:keys [url max-items index-pattern] :as config}]
+  [{:keys [url] :as config}]
   {:pre [url]}
   (ElasticsearchPublisher.
-    (as-> config $
-      (merge DEFAULT-CONFIG $)
-      ;; autodetect version when set to `:auto`
-      (update $ :els-version (fn [v] (if (= v :auto) (or (detect-els-version url) :v7.x) v)))
-      (assoc $ :index* (index-name (:index-pattern $))))
+    (apply-defaults config)
     (rb/agent-buffer 20000)
     (or (:transform config) identity)))
