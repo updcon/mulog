@@ -53,3 +53,46 @@
     from-json)
   => {:a 1 :b "hello" :c {:foo true}}
   )
+
+
+
+(fact "can serialize and parse keywords with namespace"
+
+  (->> {:one/a 1 :two.three/b "hello" :four/c {:foo true}
+      :value :some.namespaced/keyword}
+    to-json
+    from-json)
+  => {:one/a 1 :two.three/b "hello" :four/c {:foo true}
+     :value "some.namespaced/keyword"}
+  )
+
+
+
+(fact "can serialiase and deserialiase an event"
+
+  (->>
+    {:mulog/event-name :your-ns/availability,
+     :mulog/timestamp  1587504242983,
+     :mulog/trace-id   #mulog/flake "4VTF9QBbnef57vxVy-b4uKzh7dG7r7y4",
+     :mulog/root-trace #mulog/flake "4VTF9QBbnef57vxVy-b4uKzh7dG7r7y4",
+     :mulog/duration   254402837,
+     :mulog/namespace  "your-ns",
+     :mulog/outcome    :ok,
+     :app-name         "mulog-demo",
+     :env              "local",
+     :version          "0.1.0"}
+    to-json
+    from-json)
+  =>
+  {:mulog/event-name "your-ns/availability",              ;; str
+   :mulog/timestamp  1587504242983,
+   :mulog/trace-id   "4VTF9QBbnef57vxVy-b4uKzh7dG7r7y4",  ;; str
+   :mulog/root-trace "4VTF9QBbnef57vxVy-b4uKzh7dG7r7y4",  ;; str
+   :mulog/duration   254402837,
+   :mulog/namespace  "your-ns",
+   :mulog/outcome    "ok",                                ;; str
+   :app-name         "mulog-demo",
+   :env              "local",
+   :version          "0.1.0"}
+
+  )
