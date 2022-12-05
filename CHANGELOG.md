@@ -1,16 +1,23 @@
 # Changelog
 
-## v0.9.0 - (unreleased)
+## v0.10.0 - (unreleased)
+
+  - Fixed issue on Elasticsearch while logging java *Error classes. #98
+
+## v0.9.0 - (2022-07-11)
 
   - [**NEW**] Switch base JSON library to `com.cnuernber/charred`.
     Potentially a **BREAKING CHANGE** if you have custom JSON
     encoders.  Previously using
-    [Jasonista](https://github.com/metosin/jsonista) which it could
+    [Jsonista](https://github.com/metosin/jsonista) which it could
     conflicts with [Cheshire](https://github.com/dakrone/cheshire) as
     both libraries depend on
     [FasterXML/jackson](https://github.com/FasterXML/jackson).
     If you have custom JSON encoders update them to Charred as described
     in [How to JSON encode custom Java classes](https://cljdoc.org/d/com.brunobonacci/mulog/CURRENT/doc/howtos/how-to-json-encode-custom-java-classes).
+  - Fixed Elasticsearch: strengthen handling of partial failures, fix #91
+  - Fixed `pprint-event-str` with non keyword keys (#93, thanks @thomascothran)
+  - Fixed Elasticsearch: for data streams the `index` action instead of `create` #92
 
 
 ## v0.8.2 - (2022-03-27)

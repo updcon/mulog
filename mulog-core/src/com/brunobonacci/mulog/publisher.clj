@@ -103,15 +103,13 @@
 (defn simple-file-publisher
   [{:keys [filename transform] :as config}]
   {:pre [filename]}
-  (let [filename (io/file filename)]
-    ;; make parent dirs
-    (when-let [path (.getParentFile filename)]
-      (.mkdirs path))
-    (SimpleFilePublisher.
-      config
-      (io/writer filename :append true)
-      (rb/agent-buffer 10000)
-      (or transform identity))))
+  (when (or (string? filename) (instance? java.io.File filename))
+    (io/make-parents filename))
+  (SimpleFilePublisher.
+    config
+    (io/writer filename :append true)
+    (rb/agent-buffer 10000)
+    (or transform identity)))
 
 
 
@@ -255,6 +253,13 @@
     "com.brunobonacci/mulog-elasticsearch"
     config))
 
+
+(defmethod publisher-factory :file-json
+  [config]
+  (load-dynamic-publisher
+    "com.brunobonacci.mulog.publishers.file-json/json-file-publisher"
+    "com.brunobonacci/mulog-adv-file"
+    config))
 
 
 (defmethod publisher-factory :jvm-metrics
