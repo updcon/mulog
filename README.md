@@ -109,10 +109,10 @@ In order to use the library add the dependency to your `project.clj`
 
 ``` clojure
 ;; Leiningen project
-[com.brunobonacci/mulog "0.9.0"]
+[com.brunobonacci/mulog "0.10.0"]
 
 ;; deps.edn format
-{:deps { com.brunobonacci/mulog {:mvn/version "0.9.0"}}}
+{:deps { com.brunobonacci/mulog {:mvn/version "0.10.0"}}}
 ```
 
 Current version: [![Clojars Project](https://img.shields.io/clojars/v/com.brunobonacci/mulog.svg)](https://clojars.org/com.brunobonacci/mulog)
@@ -524,6 +524,7 @@ Here the list of all available publishers:
     - [Jaeger Publisher](./doc/publishers/jaeger-publisher.md)
     - [Kafka Publisher](./doc/publishers/kafka-publisher.md)
     - [Kinesis Publisher](./doc/publishers/kinesis-publisher.md)
+    - [OpenTelemetry Publisher](./doc/publishers/open-telemetry-publisher.md)
     - [Prometheus Publisher](./doc/publishers/prometheus-publisher.md)
     - [Slack Publisher](./doc/publishers/slack-publisher.md)
     - [Zipkin Publisher](./doc/publishers/zipkin-publisher.md)
@@ -586,4 +587,4 @@ Here there are some other open-source projects which are related to ***μ/log***
 
 ## License
 
-Copyright © 2019-2021 Bruno Bonacci - Distributed under the [Apache License v2.0](http://www.apache.org/licenses/LICENSE-2.0)
+Copyright © 2019-2025 Bruno Bonacci - Distributed under the [Apache License v2.0](http://www.apache.org/licenses/LICENSE-2.0)

@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     machine:
-      image: ubuntu-2204:2024.01.2
+      image: ubuntu-2404:2024.11.1
     working_directory: ~/repo
 
     environment:
@@ -12,6 +12,13 @@ jobs:
       AWS_SECRET_ACCESS_KEY: "localstack"
 
     steps:
+      - run:
+          name: Install Babashka
+          command: |
+            curl https://mise.run | sh
+            echo "eval \"\$(/home/circleci/.local/bin/mise activate bash)\"" >> ~/.bashrc
+            eval "$(/home/circleci/.local/bin/mise activate bash)"
+            mise use --global babashka@latest
       - checkout
       - run:
           name: Dependencies list
@@ -25,7 +32,7 @@ jobs:
             - maven-repo-v1-{{ .Branch }}-
             - maven-repo-v1-
 
-      - run: make all
+      - run: bb all
 
       # don't cache local artifacts
       - run: rm -fr ~/.m2/repository/com/brunobonacci/

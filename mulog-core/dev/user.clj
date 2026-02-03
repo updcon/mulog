@@ -58,6 +58,8 @@
   ;; stop publishers
   (p1)
   (p2)
+
+  (u/stop-all-publishers!)
   )
 
 
@@ -85,7 +87,7 @@
 
   (def st
     (u/start-publisher!
-      {:type :console}))
+      {:type :console :pretty? true}))
 
   (def st2
     (u/start-publisher!
@@ -137,6 +139,80 @@
 
   )
 
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                                                                            ;;
+;;                ----==| O P E N   T E L E M E T R Y |==----                 ;;
+;;                                                                            ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(comment
+
+  (def st
+    (u/start-publisher!
+      {:type :console :pretty? true}))
+
+  (def st2
+    (u/start-publisher!
+      {:type :multi
+       :publishers
+       [{:type :open-telemetry
+         :send :traces
+         :url  "http://localhost:4318/"}
+        {:type :open-telemetry
+         :send :logs
+         :url  "http://localhost:4318/"}]}))
+
+
+  (u/set-global-context! {:app "demo" :version 1 :env "local"})
+
+  (u/log :test :t (rand))
+
+  (u/trace :test-trace
+    [:foo 1, :t (rand)]
+    (Thread/sleep (rand-int 50)))
+
+  (u/trace :test-trace-wth-result
+    {:pairs [:foo 1, :t (rand)] :capture #(select-keys % [:hello])}
+    {:hello "world" :capture "test"})
+
+  (u/trace :test-trace-capture-error
+    {:pairs [:foo 1, :t (rand)] :capture #(select-keys % [:hello])}
+    (rand-int 100))
+
+  (u/trace :test-trace-wth-result
+    {:pairs [:foo 1, :t (rand)] :capture (fn [x] {:return x})}
+    (rand-int 100))
+
+  (u/trace :test-syntax-error
+    (identity {:pairs [:foo 1, :t (rand)] :capture-result :hello})
+    {:hello "world"})
+
+  (u/trace :big-operation
+    [:v 1 :level 0]
+    (Thread/sleep (rand-int 2000))
+
+    (u/trace :small-operation
+      [:level 1 :seq 1]
+      (Thread/sleep (rand-int 2000)))
+
+    (u/trace :small-operation
+      [:level 1 :seq 2]
+      (Thread/sleep (rand-int 2000))
+
+      (u/trace :operation
+        [:level 3]
+        (Thread/sleep (rand-int 1000)))
+
+      (Thread/sleep (rand-int 10)))
+    (Thread/sleep (rand-int 200)))
+
+  (st2)
+  (st)
+  )
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -220,7 +296,7 @@
 
   (u/log ::hello :to "World!")
 
-  (u/start-publisher! {:type :console})
+  (u/start-publisher! {:type :console :pretty? true})
 
   (u/log ::hello :to "World!" :v (rand-int 1000))
   (u/log ::hello :to "World!" :v "ciao")

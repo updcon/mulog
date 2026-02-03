@@ -100,7 +100,8 @@
         buffer
         ;; else send to cloudwatch
         (do
-          (put-log-events cw-client stream-name config (transform (map second items)) next-token)
+          (when-let [records (not-empty (transform (map second items)))]
+            (put-log-events cw-client stream-name config records next-token))
           (rb/dequeue buffer last-offset))))))
 
 

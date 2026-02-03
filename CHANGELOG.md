@@ -1,8 +1,15 @@
 # Changelog
 
-## v0.10.0 - (unreleased)
+## v0.10.0 - (2025-12-11)
 
+  - [**NEW**] Added new OpenTelemetry publisher (no wrappers required) #108
+  - Bumping dependencies on all modules
   - Fixed issue on Elasticsearch while logging java *Error classes. #98
+  - Fixed issue on CloudWatch Logs when publishing empty payloads. #125
+  - Improved tags serialization for zipkin publisher
+  - [NEW] Zipkin publisher now supports custom `:http-opts` for auth
+  - Added integration tests with testcontainers for ELS, CloudWatch, Kinesis
+  - Fixed issue on Elasticsearch publisher with heterogeneous arrays #129
 
 ## v0.9.0 - (2022-07-11)
 

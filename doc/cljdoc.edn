@@ -4,6 +4,7 @@
   ["F.A.Q." {:file "doc/faq.md"}]
   ["μ/log internals" {:file "doc/mulog-internals.md"}]
   ["Custom transformations" {:file "doc/custom-transform.md"}]
+  ["Troubleshooting" {:file "doc/troubleshooting.md"}]
 
   ["Publishers"
    ["Simple Console Publisher" {:file "doc/publishers/simple-console-publisher.md"}]
@@ -15,6 +16,7 @@
    ["Jaeger Publisher" {:file "doc/publishers/jaeger-publisher.md"}]
    ["Kafka Publisher" {:file "doc/publishers/kafka-publisher.md"}]
    ["Kinesis Publisher" {:file "doc/publishers/kinesis-publisher.md"}]
+   ["OpenTelemetry Publisher" {:file "doc/publishers/open-telemetry-publisher.md"}]
    ["Prometheus Publisher" {:file "doc/publishers/prometheus-publisher.md"}]
    ["Slack Publisher" {:file "doc/publishers/slack-publisher.md"}]
    ["Zipkin Publisher" {:file "doc/publishers/zipkin-publisher.md"}]
